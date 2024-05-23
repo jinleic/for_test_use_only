@@ -4,10 +4,11 @@
 # In[1]:
 
 
+import juliacall
 import numpy as np
 from juliacall import Main as jl
-import juliacall
 from scipy.sparse import csc_matrix
+from phisolve.problems.boxqp import BoxQP
 
 jl.seval("using Pkg")
 jl.seval('Pkg.activate("./")')
@@ -31,36 +32,70 @@ tolerance = 1e-5  # Example tolerance value
 time_sec_limit = 3600  # Example time limit in seconds
 
 
-# In[2]:
+# In[3]:
 
 
-n = 5
-Q = np.array(
-    [
-        [4, 1, 0, 0, 0],
-        [1, 3, 1, 0, 0],
-        [0, 1, 2, 1, 0],
-        [0, 0, 1, 3, 1],
-        [0, 0, 0, 1, 4],
-    ]
-)
-w = np.array([1, 1, 1, 1, 1])
+n = 10
+sparsity = 3
+banded = True
+index = 0
+n_shots = 1000
+n_steps = 10000
+
+with np.load(
+    f"./benchmarks/boxqp_n{n}_sp{sparsity}_{'banded' if banded else 'nonbanded'}_{index}.npz"
+) as data:
+    Q = data["Q"]
+    w = data["w"]
+    lb = data["lb"]
+    ub = data["ub"]
+    sol = data["sol"]
+
+samples = np.load("samples.npy")
+
+
+# In[4]:
+
+
+problem = BoxQP(Q=Q, w=w, bounds=(lb, ub))
+
+
+# In[12]:
+
+
+problem.Q
+problem.w
+problem.bounds[0]
+problem.bounds[1]
+problem.nvar
+
+
+# In[ ]:
+
+
+
+
+
+# In[7]:
 
 
 num_variables = n
 num_constraints = 0  # No additional constraints beyond 0 <= x <= 1
 variable_lower_bound = np.zeros(n)
 variable_upper_bound = np.ones(n)
-isfinite_variable_lower_bound = np.zeros(n, dtype=bool)
-isfinite_variable_upper_bound = np.zeros(n, dtype=bool)
+isfinite_variable_lower_bound = np.ones(n, dtype=bool)
+isfinite_variable_upper_bound = np.ones(n, dtype=bool)
 objective_constant = 0.0
-constraint_matrix = np.identity(n)  # No additional constraints
-right_hand_side = np.zeros(n)  # No constraints
+constraint_matrix = np.vstack(
+    [np.identity(n), -np.identity(n)]
+)  # No additional constraints
+right_hand_side = np.hstack([np.ones(n), np.zeros(n)])  # No constraints
 num_equalities = 0
 
 Q_julia = jl.convert(jl.SparseMatrixCSC, Q)
 
 constraint_matrix_julia = jl.convert(jl.SparseMatrixCSC, constraint_matrix)
+constraint_matrix_julia_t = jl.convert(jl.SparseMatrixCSC, constraint_matrix.T)
 
 qp = jl.PDQP.QuadraticProgrammingProblem(
     num_variables,
@@ -73,12 +108,10 @@ qp = jl.PDQP.QuadraticProgrammingProblem(
     w.tolist(),
     objective_constant,
     constraint_matrix_julia,
-    constraint_matrix_julia,
+    constraint_matrix_julia_t,
     right_hand_side.tolist(),
     num_equalities,
 )
-
-print(qp)
 
 # Construct restart parameters
 restart_params = jl.PDQP.construct_restart_parameters(
@@ -107,7 +140,7 @@ params = jl.PDQP.PdhgParameters(
     1.0,
     1.0,
     True,
-    2,
+    0,
     True,
     40,
     termination_params,
@@ -115,19 +148,39 @@ params = jl.PDQP.PdhgParameters(
     jl.PDQP.ConstantStepsizeParams(),
 )
 
+if gpu_flag:
+    output = jl.PDQP.optimize_gpu(
+        params, qp, juliacall.convert(jl.Vector[jl.Float64], samples[0])
+    )
+else:
+    output = jl.PDQP.optimize(
+        params, qp, juliacall.convert(jl.Vector[jl.Float64], samples[0])
+    )
+result = output.primal_solution
+res = np.array(result)
 
-# In[3]:
+
+# In[5]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
 
 
 import numpy as np
 from juliacall import Main as jl
 
-jl.seval('using SparseArrays')
+jl.seval("using SparseArrays")
 
-Q = np.array([
-    [2, 2],
-    [2, 4]
-])
+Q = np.array([[2, 2], [2, 4]])
 
 w = np.array([2.0, -1.0])
 
@@ -143,9 +196,6 @@ constraint_matrix_dense = np.array([[-1.0, -1.0]])
 constraint_matrix_t_dense = constraint_matrix_dense.T
 
 right_hand_side = np.array([-3.0])
-
-constraint_lower_bound = np.array([-np.inf])
-constraint_upper_bound = np.array([3.0])
 
 num_equalities = 0
 
@@ -166,20 +216,22 @@ qp = jl.PDQP.QuadraticProgrammingProblem(
     constraint_matrix_julia,
     constraint_matrix_t_julia,
     right_hand_side.tolist(),
-    num_equalities
+    num_equalities,
 )
 
 print(qp)
 
 
-# In[4]:
+# In[ ]:
 
 
 print("Warm Start ??")
-ini = np.array([1,1])
+ini = np.array([1, 1])
 print(qp)
 if gpu_flag:
-    output = jl.PDQP.optimize_gpu(params, qp, juliacall.convert(jl.Vector[jl.Float64], ini))
+    output = jl.PDQP.optimize_gpu(
+        params, qp, juliacall.convert(jl.Vector[jl.Float64], ini)
+    )
 else:
     output = jl.PDQP.optimize(params, qp, juliacall.convert(jl.Vector[jl.Float64], ini))
 result = output.primal_solution
@@ -187,14 +239,16 @@ res = np.array(result)
 print(res)
 
 
-# In[5]:
+# In[ ]:
 
 
 print("Cold Start")
-ini = np.array([0,0])
+ini = np.array([0, 0])
 print(qp)
 if gpu_flag:
-    output = jl.PDQP.optimize_gpu(params, qp, juliacall.convert(jl.Vector[jl.Float64], ini))
+    output = jl.PDQP.optimize_gpu(
+        params, qp, juliacall.convert(jl.Vector[jl.Float64], ini)
+    )
 else:
     output = jl.PDQP.optimize(params, qp, juliacall.convert(jl.Vector[jl.Float64], ini))
 result = output.primal_solution
@@ -202,7 +256,7 @@ res = np.array(result)
 print(res)
 
 
-# In[6]:
+# In[ ]:
 
 
 print("Julia load mps instance:")
