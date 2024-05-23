@@ -32,7 +32,7 @@ tolerance = 1e-5  # Example tolerance value
 time_sec_limit = 3600  # Example time limit in seconds
 
 
-# In[3]:
+# In[2]:
 
 
 n = 10
@@ -54,13 +54,13 @@ with np.load(
 samples = np.load("samples.npy")
 
 
-# In[4]:
+# In[3]:
 
 
 problem = BoxQP(Q=Q, w=w, bounds=(lb, ub))
 
 
-# In[12]:
+# In[4]:
 
 
 problem.Q
@@ -76,13 +76,13 @@ problem.nvar
 
 
 
-# In[7]:
+# In[5]:
 
 
 num_variables = n
 num_constraints = 0  # No additional constraints beyond 0 <= x <= 1
-variable_lower_bound = np.zeros(n)
-variable_upper_bound = np.ones(n)
+variable_lower_bound = lb
+variable_upper_bound = ub
 isfinite_variable_lower_bound = np.ones(n, dtype=bool)
 isfinite_variable_upper_bound = np.ones(n, dtype=bool)
 objective_constant = 0.0

@@ -276,8 +276,12 @@ Main algorithm
 """
 function optimize_gpu(
     params::PdhgParameters,
-    original_problem::QuadraticProgrammingProblem,
+    original_problem::QuadraticProgrammingProblem,    
+    initial_primal_solution::Vector{Float64} = zeros(Float64, length(original_problem.variable_lower_bound)),
+    # initial_dual_solution::Vector{Float64} = zeros(Float64, length(original_problem.right_hand_side)),
 )
+    gpu_initial_primal_solution = CuArray(initial_primal_solution)
+
     validate(original_problem)
     qp_cache = cached_quadratic_program_info(original_problem)
     scaled_problem = rescale_problem(
@@ -304,7 +308,8 @@ function optimize_gpu(
 
     # initialization
     solver_state = CuPdhgSolverState(
-        CUDA.zeros(Float64, primal_size),    # current_primal_solution
+        gpu_initial_primal_solution,
+        # CUDA.zeros(Float64, primal_size),    # current_primal_solution
         CUDA.zeros(Float64, dual_size),      # current_dual_solution
         CUDA.zeros(Float64, primal_size),    # delta_primal
         CUDA.zeros(Float64, dual_size),      # delta_dual

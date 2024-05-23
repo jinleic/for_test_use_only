@@ -1,0 +1,8 @@
+README.md
+pdqp_wrap.py
+setup.py
+pdqp_wrap.egg-info/PKG-INFO
+pdqp_wrap.egg-info/SOURCES.txt
+pdqp_wrap.egg-info/dependency_links.txt
+pdqp_wrap.egg-info/requires.txt
+pdqp_wrap.egg-info/top_level.txt
