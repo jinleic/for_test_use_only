@@ -1,3 +1,6 @@
+This is just a test mod after name change.
+This repo contains only prototype codes of a python wrapper
+
 # PDQP.jl
 
 This repository contains experimental code for solving quadratic programming using first-order methods on CPUs or NVIDIA GPUs. 
